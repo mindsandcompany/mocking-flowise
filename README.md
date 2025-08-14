@@ -35,13 +35,9 @@ mock_workflow/
 - OpenRouter API Key (`OPENROUTER_API_KEY`)
 - searchapi.io API Key (`SEARCHAPI_KEY`) — 웹 검색 툴 사용 시 필요
 
-## 설치 및 실행 (로컬)
-1) 저장소 클론 및 의존성 설치
-```bash
-pip install -r requirements.txt
-```
+## 설치 및 실행
 
-2) 환경 변수 설정(`.env` 권장)
+### 환경 변수 설정(`.env` 권장)
 ```bash
 # .env 예시
 OPENROUTER_API_KEY=<your_openrouter_api_key>
@@ -50,22 +46,7 @@ SEARCHAPI_KEY=<your_searchapi_key>
 PORT=6666
 ```
 
-3) 시스템 프롬프트 파일 생성
-```bash
-mkdir -p prompts
-cat > prompts/system.txt << 'EOF'
-You are a helpful assistant. Prefer concise, accurate answers. Use tools when beneficial.
-EOF
-```
-
-4) 서버 실행
-```bash
-python app.py
-# 또는
-uvicorn app:app --host 0.0.0.0 --port ${PORT:-6666}
-```
-
-## Docker로 실행
+### Docker로 실행
 ```bash
 # 이미지 빌드
 docker build -t mocking-flowise .
@@ -75,20 +56,7 @@ docker run -d --name mocking-flowise \
   mocking-flowise:latest
 ```
 
-## API
-- 헬스 체크
-  - GET `/health` → `{ "status": "ok" }`
-
-- 채팅 스트림(SSE)
-  - POST `/chat/stream`
-  - Content-Type: `application/json`
-  - Request Body:
-    ```json
-    { "question": "파이썬 3.12 주요 변경점 요약해줘" }
-    ```
-  - Response: `text/event-stream` (SSE)
-
-### SSE 이벤트 규칙 (GenOS 채팅 앱 표현 규칙)
+## SSE 이벤트 규칙 (GenOS 채팅 앱 표현 규칙)
 - 본 프로젝트는 각 SSE 청크를 다음과 같은 JSON 한 줄로 보냅니다. 실제 SSE 라인은 아래 형식입니다.
   - `data: {"event": string, "data": any}` + 빈 줄
   - 주기적 하트비트: `: keep-alive` (클라이언트는 무시 가능)
@@ -198,3 +166,8 @@ async def run(data: dict) -> dict:
   1) `tools/my_tool.py`에 실행 함수, `WEB_MY_TOOL` 스키마, `VisibleMyToolModel` 구현
   2) `tools/__init__.py`의 `TOOL_MAP`, `VISIBLE_TOOL_MAP`에 등록
   3) `app.py`의 `tools = [...]` 목록에 `WEB_MY_TOOL` 추가
+
+---
+
+## 주의사항
+- 현재 멀티턴 구현은 안되어있습니다.
