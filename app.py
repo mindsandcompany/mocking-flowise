@@ -22,7 +22,7 @@ from tools import (
 )
 
 
-app = FastAPI(title="pptx-agent API", version="1.0.0")
+app = FastAPI(title="mocking-flowise API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,6 +79,7 @@ async def chat_stream(req: GenerateRequest):
                     temperature=0.2,
                 ):
                     if is_sse(res):
+                        print(res)
                         await emit(res["event"], res["data"])
                     else:
                         messages.append(res)

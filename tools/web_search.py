@@ -9,7 +9,7 @@ from typing import Literal
 class SingleSearchModel(BaseModel):
     q: str = Field(description="search string (use the language that's most likely to match the sources)")
     recency: int | None = Field(description="limit to recent N days, or null", default=None)
-    domains: list[str] | None = Field(description="restrict to domains (e.g. [\"example.com\", \"another.com\"], or null)", default=None)
+    domains: list[str] | None = Field(description='restrict to domains (e.g. ["example.com", "another.com"], or null)', default=None)
 
 
 class MultipleSearchModel(BaseModel):
@@ -17,8 +17,8 @@ class MultipleSearchModel(BaseModel):
     response_length: Literal["short", "medium", "long"] = Field(description="response length option", default="medium")
 
 
-class VisibleWebSearchModel(BaseModel):
-    node_label: str = "Visible Query Generator"
+class VisibleWebSearchModel:
+    node_label = "Visible Query Generator"
     
     @classmethod
     def format(cls, args: dict):
@@ -67,7 +67,7 @@ async def web_search(
         return f"Error validating `web_search`: {e}"
 
     async with aiohttp.ClientSession() as session:
-        tasks = [single_search(session, sq.q, sq.recency, sq.domains, response_length) for sq in search_query]
+        tasks = [single_search(session, sq['q'], sq.get('recency'), sq.get('domains'), response_length) for sq in search_query]
         results = await asyncio.gather(*tasks)
     
     flatted_res = [item for sublist in results for item in sublist]
