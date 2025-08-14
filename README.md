@@ -43,10 +43,11 @@ mock_workflow/
 OPENROUTER_API_KEY=<your_openrouter_api_key>
 DEFAULT_MODEL=openai/gpt-4o-mini
 SEARCHAPI_KEY=<your_searchapi_key>
-PORT=6666
 ```
 
 ### Docker로 실행
+Dockerflie에서 컨테이너와 연결하고 싶은 포트(이 예제에서는 6666)를 설정해줍니다. 
+
 ```bash
 # 이미지 빌드
 docker build -t mocking-flowise .

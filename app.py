@@ -1,7 +1,7 @@
 import os
 import asyncio
 import json
-from typing import Coroutine
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,8 +61,11 @@ async def chat_stream(req: GenerateRequest):
         """
         주요한 로직 구현
         """
+        system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
+            current_date=datetime.now().strftime("%Y-%m-%d")
+        )
         messages = [
-            {"role": "system", "content": (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8")},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": req.question}
         ]
 
@@ -100,7 +103,7 @@ async def chat_stream(req: GenerateRequest):
                                     }
                                 }
                             })
-                        if isinstance(tool_res, Coroutine):
+                        if asyncio.iscoroutine(tool_res):
                             tool_res = await tool_res
                     except Exception as e:
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
