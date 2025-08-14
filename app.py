@@ -61,17 +61,18 @@ async def chat_stream(req: GenerateRequest):
         """
         주요한 로직 구현
         """
-        system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
-            current_date=datetime.now().strftime("%Y-%m-%d")
-        )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": req.question}
-        ]
-
-        tools = [WEB_SEARCH]
-        
         try:
+            system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
+                current_date=datetime.now().strftime("%Y-%m-%d"),
+                locale="ko-KR"
+            )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": req.question}
+            ]
+
+            tools = [WEB_SEARCH]
+
             while True:
                 async for res in call_llm_stream(
                     messages=messages, 
@@ -79,7 +80,6 @@ async def chat_stream(req: GenerateRequest):
                     temperature=0.2,
                 ):
                     if is_sse(res):
-                        print(res)
                         await emit(res["event"], res["data"])
                     else:
                         messages.append(res)
@@ -100,7 +100,7 @@ async def chat_stream(req: GenerateRequest):
                                 "nodeLabel": node_label,
                                 "data": {
                                     "output": {
-                                        "content": json.dumps(visible_res)
+                                        "content": json.dumps(visible_res, ensure_ascii=False)
                                     }
                                 }
                             })
