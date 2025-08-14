@@ -20,6 +20,13 @@ except Exception as e:
     sys.exit(1)
 
 
+class States:
+    messages: list[dict]
+    turn: int = 0
+    tools: list[dict] = []
+    tool_results: dict[str, Any] = {}
+
+
 async def call_llm_stream(
     messages: list[dict], 
     model: str = os.getenv("DEFAULT_MODEL"), 

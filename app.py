@@ -14,6 +14,7 @@ from utils import (
     call_llm_stream,
     is_sse,
     ROOT_DIR,
+    States,
 )
 from tools import (
     TOOL_MAP,
@@ -66,23 +67,23 @@ async def chat_stream(req: GenerateRequest):
                 current_date=datetime.now().strftime("%Y-%m-%d"),
                 locale="ko-KR"
             )
-            messages = [
+            states = States()
+            states.messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": req.question}
             ]
-
-            tools = [WEB_SEARCH]
+            states.tools = [WEB_SEARCH]
 
             while True:
                 async for res in call_llm_stream(
-                    messages=messages, 
-                    tools=tools,
+                    messages=states.messages, 
+                    tools=states.tools,
                     temperature=0.2,
                 ):
                     if is_sse(res):
                         await emit(res["event"], res["data"])
                     else:
-                        messages.append(res)
+                        states.messages.append(res)
                 
                 tool_calls = res.get("tool_calls")
                 if not tool_calls:
@@ -92,7 +93,7 @@ async def chat_stream(req: GenerateRequest):
                     tool_args = json.loads(tool_call['function']['arguments'])
                     
                     try:
-                        tool_res = TOOL_MAP[tool_name](**tool_args)
+                        tool_res = TOOL_MAP[tool_name](states, **tool_args)
                         if tool_name in VISIBLE_TOOL_MAP:
                             node_label = VISIBLE_TOOL_MAP[tool_name].node_label
                             visible_res = VISIBLE_TOOL_MAP[tool_name].format(tool_args)
@@ -109,7 +110,7 @@ async def chat_stream(req: GenerateRequest):
                     except Exception as e:
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
-                    messages.append({"role": "tool", "content": tool_res, "tool_call_id": tool_call['id']})
+                    states.messages.append({"role": "tool", "content": tool_res, "tool_call_id": tool_call['id']})
 
         except Exception as e:
             await emit("error", str(e))

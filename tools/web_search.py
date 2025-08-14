@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 from typing import Literal
 
+from utils import States
+
 
 class SingleSearchModel(BaseModel):
     q: str = Field(description="search string (use the language that's most likely to match the sources)")
@@ -55,6 +57,7 @@ WEB_SEARCH = {
 
 
 async def web_search(
+    states: States,
     search_query: list[dict], 
     response_length: Literal["short", "medium", "long"]
 ) -> str:
@@ -71,12 +74,19 @@ async def web_search(
         results = await asyncio.gather(*tasks)
     
     flatted_res = [item for sublist in results for item in sublist]
-    output = [{'id': f'turn{idx}search{idx}', **item} for idx, item in enumerate(flatted_res)]
+    
+    outputs = []
+    for idx, item in enumerate(flatted_res):
+        id = f'turn{states.turn}search{idx}'
+        states.tool_results[id] = item
+        outputs.append({'id': id, **item})
+    
+    states.turn += 1
     
     return "\n".join([
         f'- {item["title"]} ({item["source"]}): {item["date"]} — {item["snippet"]} 【{item["id"]}】' if item['date'] else
         f'- {item["title"]} ({item["source"]}): {item["snippet"]} 【{item["id"]}】'
-        for item in output
+        for item in outputs
     ])
 
 
