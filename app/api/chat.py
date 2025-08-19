@@ -99,6 +99,7 @@ async def chat_stream(req: GenerateRequest):
                     states.messages.append({"role": "tool", "content": tool_res, "tool_call_id": tool_call['id']})
 
         except Exception as e:
+            print(e)
             await emit("error", str(e))
         finally:
             last_message = states.messages[-1]
