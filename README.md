@@ -14,6 +14,8 @@
 - 툴 호출 지원: 예시로 `web_search`(searchapi.io 기반) 포함
 - 툴 실행 내용을 GenOS 채팅 UI에 노출하기 위한 전용 이벤트(`agentFlowExecutedData`) 전송
 - Docker로 손쉽게 배포 가능
+- Redis 기반 멀티세션(chatId) 지원: `chatId`로 세션 저장/복구, 스트림 시작 시 `session` 이벤트로 `chatId` 알림
+- docker-compose로 API + Redis 동시 실행 가능
 
 ## 디렉터리 구조
 ```text
@@ -25,6 +27,8 @@ mock_workflow/
   │   └─ web_search.py      # 웹 검색 툴 정의 및 보이는 정보 포맷 정의
   ├─ prompts/
   │   └─ system.txt         # 시스템 프롬프트
+  ├─ session_store.py       # Redis 기반 세션 저장/복구 로직
+  ├─ docker-compose.yml     # API + Redis 구성
   ├─ requirements.txt
   ├─ Dockerfile
   └─ README.md
@@ -34,6 +38,7 @@ mock_workflow/
 - Python 3.11+
 - OpenRouter API Key (`OPENROUTER_API_KEY`)
 - searchapi.io API Key (`SEARCHAPI_KEY`) — 웹 검색 툴 사용 시 필요
+- Redis 7.x (도커 컴포즈 사용 시 자동 구성, 로컬 실행 시 `REDIS_URL`로 연결)
 
 ## 설치 및 실행
 
@@ -43,19 +48,20 @@ mock_workflow/
 OPENROUTER_API_KEY=<your_openrouter_api_key>
 DEFAULT_MODEL=openai/gpt-4o-mini
 SEARCHAPI_KEY=<your_searchapi_key>
+# 선택: 로컬 Redis를 쓸 때
+# REDIS_URL=redis://localhost:6379/0
 ```
 
-### Docker로 실행
-Dockerflie에서 컨테이너와 연결하고 싶은 포트(이 예제에서는 6666)를 설정해줍니다. 
-
+### Docker Compose로 실행 (권장)
 ```bash
-# 이미지 빌드
-docker build -t mocking-flowise .
-# 컨테이너 실행
-docker run -d --name mocking-flowise \
-  -p 6666:6666 \
-  mocking-flowise:latest
+docker compose up -d --build
+# 상태 확인
+docker compose ps
+# 헬스체크
+curl -s http://localhost:6666/health | cat
 ```
+- 코드/의존성/Dockerfile 변경 후에는 `--build`를 붙여 최신 상태로 반영하세요.
+
 
 ## SSE 이벤트 규칙 (GenOS 채팅 앱 표현 규칙)
 - 본 프로젝트는 각 SSE 청크를 다음과 같은 JSON 한 줄로 보냅니다. 실제 SSE 라인은 아래 형식입니다.
@@ -171,4 +177,6 @@ async def run(data: dict) -> dict:
 ---
 
 ## 주의사항
-- 현재 멀티턴 구현은 안되어있습니다.
+- 멀티턴/멀티세션 지원: `POST /chat/stream`에 `chatId`를 주면 해당 세션을 이어서 대화합니다. `chatId`가 없으면 서버가 생성하며 스트림 초기에 `session` 이벤트로 전달합니다.
+- 세션 저장: Redis에 `chat:{chatId}` 키로 저장되며 기본 TTL은 7일입니다.
+- 동시성: 동일 `chatId`로 동시 요청 시 단순히 마지막 저장이 우선합니다(필요 시 분산 락/트랜잭션으로 강화 가능).
