@@ -7,9 +7,9 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from utils import call_llm_stream, is_sse, ROOT_DIR, States
-from stores.session_store import SessionStore
-from tools import TOOL_MAP, VISIBLE_TOOL_MAP, WEB_SEARCH
+from app.utils import call_llm_stream, is_sse, ROOT_DIR, States
+from app.stores.session_store import SessionStore
+from app.tools import TOOL_MAP, VISIBLE_TOOL_MAP, WEB_SEARCH
 
 router = APIRouter()
 store = SessionStore()
