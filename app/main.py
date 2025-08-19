@@ -6,8 +6,8 @@ load_dotenv()
 
 import uvicorn
 
-from api.health import router as health_router
-from api.chat import router as chat_router
+from app.api.health import router as health_router
+from app.api.chat import router as chat_router
 
 
 app = FastAPI(title="mocking-flowise API", version="1.0.0")

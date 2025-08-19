@@ -1,7 +1,7 @@
 # Mocking Flowise
 
 ## 개요
-'Mocking Flowise'는 GenOS에 탑재된 flowise로는 어렵거나 비효율적인 기능에 대해서 코드로 직접 구현하고, 도커 및 FastAPI를 이용하여 flowise와 비슷한 역할을 하는 앱을 띄운 뒤 GenOS의 워크플로우와 연결하는 예제 프로젝트입니다. 기본적인 LLM 호출 및, 툴 호출 기능까지 구현되어있습니다.
+'Mocking Flowise'는 GenOS에 탑재된 flowise로는 어렵거나 비효율적인 기능에 대해서 코드로 직접 구현하고, Docker 및 FastAPI를 이용하여 flowise와 유사한 역할을 하는 API를 제공한 뒤 GenOS의 워크플로우와 연결하는 예제 프로젝트입니다. 기본적인 LLM 스트리밍 호출(SSE)과 툴 호출 기능을 포함합니다.
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" />
@@ -13,24 +13,34 @@
 - LLM 스트리밍 응답(SSE) 지원: `token`, `reasoning_token`, `result`, `error` 이벤트 전송
 - 툴 호출 지원: 예시로 `web_search`(searchapi.io 기반) 포함
 - 툴 실행 내용을 GenOS 채팅 UI에 노출하기 위한 전용 이벤트(`agentFlowExecutedData`) 전송
-- Docker로 손쉽게 배포 가능
+- Docker/Compose로 손쉽게 실행 가능 (API + Redis)
 - Redis 기반 멀티세션(chatId) 지원: `chatId`로 세션 저장/복구, 스트림 시작 시 `session` 이벤트로 `chatId` 알림
-- docker-compose로 API + Redis 동시 실행 가능
 
 ## 디렉터리 구조
 ```text
 mock_workflow/
-  ├─ app.py                 # FastAPI 엔트리, SSE 스트리밍/툴 실행 흐름
-  ├─ utils.py               # OpenRouter(OpenAI 호환) 클라이언트, 스트림 유틸
-  ├─ tools/
-  │   ├─ __init__.py        # TOOL_MAP, VISIBLE_TOOL_MAP 등록
-  │   └─ web_search.py      # 웹 검색 툴 정의 및 보이는 정보 포맷 정의
-  ├─ prompts/
-  │   └─ system.txt         # 시스템 프롬프트
-  ├─ session_store.py       # Redis 기반 세션 저장/복구 로직
-  ├─ docker-compose.yml     # API + Redis 구성
-  ├─ requirements.txt
+  ├─ app/
+  │  ├─ __init__.py
+  │  ├─ main.py                 # FastAPI 엔트리 및 라우터 포함
+  │  ├─ api/
+  │  │  ├─ __init__.py
+  │  │  ├─ chat.py              # /chat/stream (SSE)
+  │  │  └─ health.py            # /health
+  │  ├─ prompts/
+  │  │  └─ system.txt           # 시스템 프롬프트
+  │  ├─ stores/
+  │  │  ├─ __init__.py
+  │  │  └─ session_store.py     # Redis 기반 세션 저장/복구
+  │  ├─ tools/
+  │  │  ├─ __init__.py          # TOOL_MAP, VISIBLE_TOOL_MAP 등록
+  │  │  └─ web_search.py        # 웹 검색 툴 및 공개 포맷 정의
+  │  ├─ utils.py                # OpenRouter 클라이언트, 스트림 유틸 등
+  │  └─ .env                    # 주요한 환경변수 관리
+  ├─ tests/
+  │  └─ test_chat.py            # SSE 수신 예제 스크립트
+  ├─ docker-compose.yml         # API(5555) + Redis 구성
   ├─ Dockerfile
+  ├─ requirements.txt
   └─ README.md
 ```
 
@@ -38,11 +48,9 @@ mock_workflow/
 - Python 3.11+
 - OpenRouter API Key (`OPENROUTER_API_KEY`)
 - searchapi.io API Key (`SEARCHAPI_KEY`) — 웹 검색 툴 사용 시 필요
-- Redis 7.x (도커 컴포즈 사용 시 자동 구성, 로컬 실행 시 `REDIS_URL`로 연결)
+- Redis 7.x (docker compose 사용 시 자동 구성, 로컬 실행 시 `REDIS_URL`로 연결)
 
-## 설치 및 실행
-
-### 환경 변수 설정(`.env` 권장)
+## 환경 변수 (.env 권장)
 ```bash
 # .env 예시
 OPENROUTER_API_KEY=<your_openrouter_api_key>
@@ -50,18 +58,39 @@ DEFAULT_MODEL=openai/gpt-4o-mini
 SEARCHAPI_KEY=<your_searchapi_key>
 # 선택: 로컬 Redis를 쓸 때
 # REDIS_URL=redis://localhost:6379/0
+# 선택: 로컬 실행 포트 (기본 6666)
+# PORT=6666
 ```
 
-### Docker Compose로 실행 (권장)
+## 실행 방법
+
+### 1) 로컬 실행 (개발용)
+```bash
+pip install -r requirements.txt
+export $(grep -v '^#' .env | xargs)  # 또는 수동으로 환경 변수 설정
+# 방법 A: 모듈 실행 (reload 포함)
+python -m app.main
+# 방법 B: uvicorn 직접 실행
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-6666} --reload
+```
+- 헬스체크: `curl -s http://localhost:${PORT:-6666}/health | cat`
+
+### 2) Docker Compose (권장)
 ```bash
 docker compose up -d --build
 # 상태 확인
 docker compose ps
 # 헬스체크
-curl -s http://localhost:6666/health | cat
+curl -s http://localhost:5555/health | cat
 ```
+- 컨테이너 기본 포트는 5555입니다. (Dockerfile `EXPOSE 5555` 및 Compose `5555:5555`)
 - 코드/의존성/Dockerfile 변경 후에는 `--build`를 붙여 최신 상태로 반영하세요.
 
+## 엔드포인트 요약
+- `GET /health` — 단순 헬스체크
+- `POST /chat/stream` — SSE 스트리밍 응답
+  - 헤더 예시: `Accept: text/event-stream`
+  - 요청 바디 예시: `{ "question": "...", "chatId": "옵션" }`
 
 ## SSE 이벤트 규칙 (GenOS 채팅 앱 표현 규칙)
 - 본 프로젝트는 각 SSE 청크를 다음과 같은 JSON 한 줄로 보냅니다. 실제 SSE 라인은 아래 형식입니다.
@@ -89,10 +118,23 @@ curl -s http://localhost:6666/health | cat
   - `error`: 오류 메시지(string)
   - `result`: 최종 완료 신호. `data`는 `null`
 
-## Workflow Python Step
-GenOS 워크플로우의 Python Step을 생성한 후 아래 코드에서 endpoint를 바꾸어서 사용하시면 됩니다.
-```Python
-from main_socketio import sio_server
+## 툴 사용 및 노출 규칙
+- 툴 스키마: OpenAI 함수 호출 포맷을 따르며, 예시로 `web_search`가 등록되어 있습니다.
+  - 등록 위치: `app/tools/web_search.py` 의 `WEB_SEARCH` 스키마, 실행 함수 `web_search()`
+  - 서버 등록: `app/tools/__init__.py` 의 `TOOL_MAP` (실행), `VISIBLE_TOOL_MAP` (UI 노출)
+  - 서버 사용: `app/api/chat.py`에서 `states.tools = [WEB_SEARCH]`로 사용
+- 사람이 볼 정보만 노출하기
+  - 각 툴에 대응하는 `Visible*Model`을 정의하여 `format(args)`에서 공개 가능한 정보만 추립니다.
+  - 서버는 `format(args)` 결과를 `json.dumps(...)`로 문자열화하여 `agentFlowExecutedData.data.data.output.content`에 넣어 보냅니다.
+  - `nodeLabel`은 UI 노드명으로 사용됩니다.
+- 새 툴 추가 가이드(요약)
+  1) `app/tools/my_tool.py`에 실행 함수, 스키마 `WEB_MY_TOOL`, 공개 모델 `VisibleMyToolModel` 구현
+  2) `app/tools/__init__.py`의 `TOOL_MAP`, `VISIBLE_TOOL_MAP`에 등록
+  3) `app/api/chat.py`의 `states.tools`에 `WEB_MY_TOOL` 추가
+
+## Workflow Python Step (예시)
+GenOS 워크플로우의 Python Step을 생성한 후 아래 코드에서 `endpoint`를 여러분의 배포 주소로 바꾸어 사용하시면 됩니다. (소켓 관련 로직은 사용 환경에 맞게 조정하세요.)
+```python
 import aiohttp, json
 
 async def run(data: dict) -> dict:
@@ -160,19 +202,6 @@ async def run(data: dict) -> dict:
     data.update(result)
     return data
 ```
-
-## 툴 사용 및 노출 규칙
-- 툴 스키마: OpenAI 함수 호출 포맷을 따르며, 예시로 `web_search`가 등록되어 있습니다.
-  - 등록 위치: `tools/web_search.py` 의 `WEB_SEARCH` 스키마, 실행 함수 `web_search()`
-  - 서버 등록: `tools/__init__.py` 의 `TOOL_MAP` (실행), `VISIBLE_TOOL_MAP` (UI 노출)
-- 사람이 볼 정보만 보이게 하기
-  - 각 툴에 대응하는 `Visible*Model`을 정의하여 `format(args)`에서 공개 가능한 정보만 추립니다.
-  - 서버는 `format(args)` 결과를 `json.dumps(...)`로 문자열화하여 `agentFlowExecutedData.data.data.output.content`에 넣어 보냅니다.
-  - `nodeLabel`은 UI 노드명으로 사용됩니다.
-- 새 툴 추가 가이드(요약)
-  1) `tools/my_tool.py`에 실행 함수, `WEB_MY_TOOL` 스키마, `VisibleMyToolModel` 구현
-  2) `tools/__init__.py`의 `TOOL_MAP`, `VISIBLE_TOOL_MAP`에 등록
-  3) `app.py`의 `tools = [...]` 목록에 `WEB_MY_TOOL` 추가
 
 ---
 
