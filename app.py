@@ -21,9 +21,12 @@ from tools import (
     VISIBLE_TOOL_MAP,
     WEB_SEARCH
 )
+from uuid import uuid4
+from session_store import SessionStore
 
 
 app = FastAPI(title="mocking-flowise API", version="1.0.0")
+store = SessionStore()
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +39,7 @@ app.add_middleware(
 
 class GenerateRequest(BaseModel):
     question: str
+    chatId: str | None = None
     model_config = ConfigDict(extra='allow')
 
 
@@ -63,20 +67,32 @@ async def chat_stream(req: GenerateRequest):
         주요한 로직 구현
         """
         try:
+            chat_id = req.chatId or uuid4().hex
+
             system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
                 current_date=datetime.now().strftime("%Y-%m-%d"),
                 locale="ko-KR"
             )
+
             states = States()
+            persisted = await store.get_messages(chat_id)
+            if persisted:
+                history = [
+                    *persisted,
+                    {"role": "user", "content": req.question}
+                ]
+            else:
+                history = [{"role": "user", "content": req.question}]
+            
             states.messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.question}
+                *history
             ]
             states.tools = [WEB_SEARCH]
 
             while True:
                 async for res in call_llm_stream(
-                    messages=states.messages, 
+                    messages=states.messages,
                     tools=states.tools,
                     temperature=0.2,
                 ):
@@ -84,7 +100,7 @@ async def chat_stream(req: GenerateRequest):
                         await emit(res["event"], res["data"])
                     else:
                         states.messages.append(res)
-                
+
                 tool_calls = res.get("tool_calls")
                 if not tool_calls:
                     break
@@ -115,6 +131,9 @@ async def chat_stream(req: GenerateRequest):
         except Exception as e:
             await emit("error", str(e))
         finally:
+            last_message = states.messages[-1]
+            history.append(last_message)
+            await store.save_messages(chat_id, history)
             await emit("result", None)
             await queue.put(SENTINEL)
 

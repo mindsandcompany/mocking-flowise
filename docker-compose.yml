@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    ports:
+      - "6666:6666"
+    environment:
+      - PORT=6666
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+volumes:
+  redis-data: 
