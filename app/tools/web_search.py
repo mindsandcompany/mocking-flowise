@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from utils import States
+from app.utils import States
 
 
 class SingleSearchModel(BaseModel):

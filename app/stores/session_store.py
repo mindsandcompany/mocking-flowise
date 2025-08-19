@@ -32,4 +32,4 @@ class SessionStore:
         if ttl_seconds:
             await self.client.setex(f"chat:{chat_id}", ttl_seconds, data)
         else:
-            await self.client.set(f"chat:{chat_id}", data) 
+            await self.client.set(f"chat:{chat_id}", data)

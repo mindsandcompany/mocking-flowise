@@ -3,9 +3,8 @@ services:
   api:
     build: .
     ports:
-      - "6666:6666"
+      - "5555:5555"
     environment:
-      - PORT=6666
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis

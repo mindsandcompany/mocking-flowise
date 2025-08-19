@@ -1,40 +1,18 @@
-import os
 import asyncio
 import json
 from datetime import datetime
+from uuid import uuid4
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
-from dotenv import load_dotenv
-load_dotenv()
 
-from utils import (
-    call_llm_stream,
-    is_sse,
-    ROOT_DIR,
-    States,
-)
-from tools import (
-    TOOL_MAP,
-    VISIBLE_TOOL_MAP,
-    WEB_SEARCH
-)
-from uuid import uuid4
-from session_store import SessionStore
+from utils import call_llm_stream, is_sse, ROOT_DIR, States
+from stores.session_store import SessionStore
+from tools import TOOL_MAP, VISIBLE_TOOL_MAP, WEB_SEARCH
 
-
-app = FastAPI(title="mocking-flowise API", version="1.0.0")
+router = APIRouter()
 store = SessionStore()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 class GenerateRequest(BaseModel):
@@ -43,12 +21,7 @@ class GenerateRequest(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 
-@app.get("/health")
-async def health() -> dict:
-    return {"status": "ok"}
-
-
-@app.post("/chat/stream")
+@router.post("/chat/stream")
 async def chat_stream(req: GenerateRequest):
     queue: asyncio.Queue[str] = asyncio.Queue()
     SENTINEL = "__STREAM_DONE__"
@@ -63,9 +36,6 @@ async def chat_stream(req: GenerateRequest):
             await queue.put(": keep-alive\n\n")
 
     async def runner():
-        """
-        주요한 로직 구현
-        """
         try:
             chat_id = req.chatId or uuid4().hex
 
@@ -154,11 +124,4 @@ async def chat_stream(req: GenerateRequest):
         sse(), 
         media_type="text/event-stream", 
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("PORT", "6666"))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
+    ) 

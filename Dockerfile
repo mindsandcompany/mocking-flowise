@@ -12,6 +12,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
-EXPOSE 6666
+EXPOSE 5555
 
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port 6666"] 
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 5555"]
