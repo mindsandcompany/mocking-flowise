@@ -36,8 +36,6 @@ mock_workflow/
   │  │  └─ web_search.py        # 웹 검색 툴 및 공개 포맷 정의
   │  ├─ utils.py                # OpenRouter 클라이언트, 스트림 유틸 등
   │  └─ .env                    # 주요한 환경변수 관리
-  ├─ script/
-  │  └─ docker-run.py            # 도커 빌드 및 실행 스크립트
   ├─ tests/
   │  └─ test_chat.py            # SSE 수신 예제 스크립트
   ├─ docker-compose.yml         # API(5555) + Redis 구성
@@ -79,7 +77,7 @@ uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-6666} --reload
 
 ### 2) Docker Compose (권장)
 ```bash
-docker compose --env-file .env up -d --build
+docker compose up -d --build
 # 상태 확인
 docker compose ps
 # 헬스체크
