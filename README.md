@@ -133,8 +133,9 @@ curl -s http://localhost:5555/health | cat
   3) `app/api/chat.py`의 `states.tools`에 `WEB_MY_TOOL` 추가
 
 ## Workflow Python Step (예시)
-GenOS 워크플로우의 Python Step을 생성한 후 아래 코드에서 `endpoint`를 여러분의 배포 주소로 바꾸어 사용하시면 됩니다. (소켓 관련 로직은 사용 환경에 맞게 조정하세요.)
+GenOS 워크플로우의 Python Step을 생성한 후 아래 코드에서 `endpoint`를 여러분의 배포 주소로 바꾸어 사용하시면 됩니다.
 ```python
+from main_socketio import sio_server
 import aiohttp, json
 
 async def run(data: dict) -> dict:
