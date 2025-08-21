@@ -8,8 +8,8 @@ async def get_tools_description(server_id: str):
         token_response = await session.post(
             "https://genos.mnc.ai:3443/api/admin/auth/login",
             json={
-                "user_id": "yhkim01",
-                "password": "Rladudgus01!"
+                "user_id": os.getenv("GENOS_ID"),
+                "password": os.getenv("GENOS_PW")
             }
         )
         token_response.raise_for_status()
@@ -36,7 +36,16 @@ async def get_every_mcp_tools_description():
     return out, tool_name_to_server_id
 
 
-MCP_TOOLS, MCP_TOOL_NAME_TO_SERVER_ID = asyncio.run(get_every_mcp_tools_description())
+MCP_TOOLS = []
+MCP_TOOL_NAME_TO_SERVER_ID = {}
+
+
+async def initialize_mcp_tools():
+    global MCP_TOOLS, MCP_TOOL_NAME_TO_SERVER_ID
+    if MCP_TOOLS and MCP_TOOL_NAME_TO_SERVER_ID:
+        return
+    MCP_TOOLS, MCP_TOOL_NAME_TO_SERVER_ID = await get_every_mcp_tools_description()
+
 
 
 def get_mcp_tool(tool_name: str):
@@ -64,7 +73,7 @@ def get_mcp_tool(tool_name: str):
             )
             response.raise_for_status()
             return (await response.json())['data']
-    
+
     return call_mcp_tool
 
 
