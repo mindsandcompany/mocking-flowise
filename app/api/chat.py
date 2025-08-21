@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
@@ -22,9 +22,10 @@ class GenerateRequest(BaseModel):
 
 
 @router.post("/chat/stream")
-async def chat_stream(req: GenerateRequest):
+async def chat_stream(req: GenerateRequest, request: Request):
     queue: asyncio.Queue[str] = asyncio.Queue()
     SENTINEL = "__STREAM_DONE__"
+    client_disconnected = asyncio.Event()
 
     async def emit(event: str, data):
         payload = {"event": event, "data": data}
@@ -32,6 +33,8 @@ async def chat_stream(req: GenerateRequest):
 
     async def heartbeat():
         while True:
+            if client_disconnected.is_set():
+                break
             await asyncio.sleep(10)
             await queue.put(": keep-alive\n\n")
 
@@ -61,6 +64,8 @@ async def chat_stream(req: GenerateRequest):
             states.tools = [WEB_SEARCH]
 
             while True:
+                if client_disconnected.is_set():
+                    break
                 async for res in call_llm_stream(
                     messages=states.messages,
                     tools=states.tools,
@@ -113,11 +118,15 @@ async def chat_stream(req: GenerateRequest):
         pinger = asyncio.create_task(heartbeat())
         try:
             while True:
+                if await request.is_disconnected():
+                    client_disconnected.set()
+                    break
                 chunk = await queue.get()
                 if chunk == SENTINEL:
                     break
                 yield chunk
         finally:
+            client_disconnected.set()
             producer.cancel()
             pinger.cancel()
 
