@@ -1,4 +1,4 @@
-from mcp_tools import MCP_TOOLS, get_mcp_tool
+from .mcp_tools import MCP_TOOLS, get_mcp_tool
 
 
 MCP_TOOL_MAP = {
