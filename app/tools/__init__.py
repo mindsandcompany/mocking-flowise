@@ -12,7 +12,6 @@ async def get_tool_map():
 
 
 async def get_tools_for_llm():
-    print(MCP_TOOLS)
     return [
         WEB_SEARCH,
         *MCP_TOOLS
