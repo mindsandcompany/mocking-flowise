@@ -1,26 +1,27 @@
 import os
 import asyncio
-import requests
+import aiohttp
 
 
 async def get_tools_description(server_id: str):
-    token_response = requests.post(
-        "https://genos.mnc.ai:3443/api/admin/auth/login",
-        json={
-            "user_id": "yhkim01",
-            "password": "Rladudgus01!"
-        }
-    )
-    token_response.raise_for_status()
-    token = token_response.json()["data"]["access_token"]
-    response = requests.get(
-        f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
-    )
-    response.raise_for_status()
-    return response.json()['data']
+    async with aiohttp.ClientSession() as session:
+        token_response = await session.post(
+            "https://genos.mnc.ai:3443/api/admin/auth/login",
+            json={
+                "user_id": "yhkim01",
+                "password": "Rladudgus01!"
+            }
+        )
+        token_response.raise_for_status()
+        token = (await token_response.json())["data"]["access_token"]
+        response = await session.get(
+            f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools",
+            headers={
+                "Authorization": f"Bearer {token}"
+            }
+        )
+        response.raise_for_status()
+        return (await response.json())['data']
 
 
 async def get_every_mcp_tools_description():
@@ -44,24 +45,25 @@ def get_mcp_tool(tool_name: str):
     server_id = MCP_TOOL_NAME_TO_SERVER_ID[tool_name]
 
     async def call_mcp_tool(tool_input: dict):
-        token_response = requests.post(
-            "https://genos.mnc.ai:3443/api/admin/auth/login",
-            json={
-                "user_id": os.getenv("GENOS_ID"),
-                "password": os.getenv("GENOS_PW")
-            }
-        )
-        token_response.raise_for_status()
-        token = token_response.json()["data"]["access_token"]
-        response = requests.post(
-            f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools/call",
-            headers={
-                "Authorization": f"Bearer {token}"
-            },
-            json={"tool_name": tool_name, "input_schema": tool_input}
-        )
-        response.raise_for_status()
-        return response.json()['data']
+        async with aiohttp.ClientSession() as session:
+            token_response = await session.post(
+                "https://genos.mnc.ai:3443/api/admin/auth/login",
+                json={
+                    "user_id": os.getenv("GENOS_ID"),
+                    "password": os.getenv("GENOS_PW")
+                }
+            )
+            token_response.raise_for_status()
+            token = (await token_response.json())["data"]["access_token"]
+            response = await session.post(
+                f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools/call",
+                headers={
+                    "Authorization": f"Bearer {token}"
+                },
+                json={"tool_name": tool_name, "input_schema": tool_input}
+            )
+            response.raise_for_status()
+            return (await response.json())['data']
     
     return call_mcp_tool
 
