@@ -1,0 +1,73 @@
+import os
+import asyncio
+import requests
+
+
+async def get_tools_description(server_id: str):
+    token_response = requests.post(
+        "https://genos.mnc.ai:3443/api/admin/auth/login",
+        json={
+            "user_id": "yhkim01",
+            "password": "Rladudgus01!"
+        }
+    )
+    token_response.raise_for_status()
+    token = token_response.json()["data"]["access_token"]
+    response = requests.get(
+        f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools",
+        headers={
+            "Authorization": f"Bearer {token}"
+        }
+    )
+    response.raise_for_status()
+    return response.json()['data']
+
+
+async def get_every_mcp_tools_description():
+    tool_name_to_server_id = {}
+    out = []
+    mcp_server_id_list = [endpoint.strip() for endpoint in os.getenv("MCP_SERVER_ID", "").split(",") if endpoint.strip()]
+    nested_list = await asyncio.gather(*[get_tools_description(endpoint) for endpoint in mcp_server_id_list])
+    for server_id, data in zip(mcp_server_id_list, nested_list):
+        for tool in data:
+            tool_name_to_server_id[tool['name']] = server_id
+        out.extend(data)
+    return out, tool_name_to_server_id
+
+
+MCP_TOOLS, MCP_TOOL_NAME_TO_SERVER_ID = asyncio.run(get_every_mcp_tools_description())
+
+
+def get_mcp_tool(tool_name: str):
+    if tool_name not in MCP_TOOL_NAME_TO_SERVER_ID:
+        raise ValueError(f"Tool {tool_name} not found")
+    server_id = MCP_TOOL_NAME_TO_SERVER_ID[tool_name]
+
+    async def call_mcp_tool(tool_input: dict):
+        token_response = requests.post(
+            "https://genos.mnc.ai:3443/api/admin/auth/login",
+            json={
+                "user_id": os.getenv("GENOS_ID"),
+                "password": os.getenv("GENOS_PW")
+            }
+        )
+        token_response.raise_for_status()
+        token = token_response.json()["data"]["access_token"]
+        response = requests.post(
+            f"https://genos.mnc.ai:3443/api/admin/mcp/server/test/{server_id}/tools/call",
+            headers={
+                "Authorization": f"Bearer {token}"
+            },
+            json={"tool_name": tool_name, "input_schema": tool_input}
+        )
+        response.raise_for_status()
+        return response.json()['data']
+    
+    return call_mcp_tool
+
+
+if __name__ == "__main__":
+    data = asyncio.run(get_tools_description("64"))
+    print(data)
+    # data = asyncio.run(get_mcp_tool("SamsungSecuritiesRetrieverTool")({"query": "현대자동차의 매출"}))
+    # print(data)

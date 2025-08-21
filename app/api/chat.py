@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.utils import call_llm_stream, is_sse, ROOT_DIR, States
 from app.stores.session_store import SessionStore
-from app.tools import TOOL_MAP, VISIBLE_TOOL_MAP, WEB_SEARCH
+from app.tools import TOOL_MAP, VISIBLE_TOOL_MAP, WEB_SEARCH, MCP_TOOLS
 
 router = APIRouter()
 store = SessionStore()
@@ -61,7 +61,10 @@ async def chat_stream(req: GenerateRequest, request: Request):
                 {"role": "system", "content": system_prompt},
                 *history
             ]
-            states.tools = [WEB_SEARCH]
+            states.tools = [
+                WEB_SEARCH,
+                *MCP_TOOLS
+            ]
 
             while True:
                 if client_disconnected.is_set():
@@ -134,4 +137,4 @@ async def chat_stream(req: GenerateRequest, request: Request):
         sse(), 
         media_type="text/event-stream", 
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
-    ) 
+    )
