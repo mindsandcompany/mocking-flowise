@@ -114,7 +114,6 @@ async def chat_stream(req: GenerateRequest, request: Request):
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
                     states.messages.append({"role": "tool", "content": str(tool_res), "tool_call_id": tool_call['id']})
-                    print(states.messages)
 
         except Exception as e:
             print(e)
