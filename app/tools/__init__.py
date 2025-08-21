@@ -1,6 +1,6 @@
-from .web_search import web_search, VisibleWebSearchModel, WEB_SEARCH
-from app.mcp import MCP_TOOLS, get_mcp_tool_map
-from app.mcp.mcp_tools import initialize_mcp_tools
+from .web_search import web_search, WEB_SEARCH
+from app.mcp import get_mcp_tool_map
+from app.mcp.mcp_tools import MCP_TOOLS
 
 
 async def get_tool_map():
@@ -11,14 +11,8 @@ async def get_tool_map():
     }
 
 
-async def get_visible_tool_map():
-    return {
-        "web_search": VisibleWebSearchModel,
-    }
-
-
 async def get_tools_for_llm():
-    await initialize_mcp_tools()
+    print(MCP_TOOLS)
     return [
         WEB_SEARCH,
         *MCP_TOOLS

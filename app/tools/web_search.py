@@ -15,19 +15,8 @@ class SingleSearchModel(BaseModel):
 
 
 class MultipleSearchModel(BaseModel):
-    search_query: list[dict] = Field(description="array of search query objects. You can call this tool with multiple search queries to get more results faster.")
+    search_query: list[SingleSearchModel] = Field(description="array of search query objects. You can call this tool with multiple search queries to get more results faster.")
     response_length: Literal["short", "medium", "long"] = Field(description="response length option", default="medium")
-
-
-class VisibleWebSearchModel:
-    node_label = "Visible Query Generator"
-    
-    @classmethod
-    def format(cls, args: dict):
-        queries = [sq['q'] for sq in args["search_query"]]
-        return {
-            "visible_web_search_query": queries
-        }
 
 
 WEB_SEARCH = {
@@ -58,19 +47,24 @@ WEB_SEARCH = {
 
 async def web_search(
     states: States,
-    search_query: list[dict], 
-    response_length: Literal["short", "medium", "long"]
+    tool_input: dict
 ) -> str:
     
     try:
-        MultipleSearchModel.model_validate(locals())
-        for sq in search_query:
-            SingleSearchModel.model_validate(sq)
+        tool_input: MultipleSearchModel = MultipleSearchModel.model_validate(tool_input)
     except Exception as e:
         return f"Error validating `web_search`: {e}"
 
     async with aiohttp.ClientSession() as session:
-        tasks = [single_search(session, sq['q'], sq.get('recency'), sq.get('domains'), response_length) for sq in search_query]
+        tasks = [
+            single_search(
+                session, 
+                sq.q, 
+                sq.recency, 
+                sq.domains, 
+                tool_input.response_length
+            ) for sq in tool_input.search_query
+        ]
         results = await asyncio.gather(*tasks)
     
     flatted_res = [item for sublist in results for item in sublist]

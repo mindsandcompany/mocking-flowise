@@ -5,7 +5,7 @@ async def main() -> dict:
     data = {
         "question": "영화 '84제곱미터'의 젊은 남자 주연배우의 데뷔작의 방송 횟수는?"
     }
-    endpoint = "http://0.0.0.0:6666/chat/stream"
+    endpoint = "http://0.0.0.0:5555/chat/stream"
 
     result = {}
     text_acc = ""

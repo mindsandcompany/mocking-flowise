@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.utils import call_llm_stream, is_sse, ROOT_DIR, States
 from app.stores.session_store import SessionStore
-from app.tools import get_tool_map, get_visible_tool_map, get_tools_for_llm
+from app.tools import get_tool_map, get_tools_for_llm
 
 router = APIRouter()
 store = SessionStore()
@@ -63,7 +63,6 @@ async def chat_stream(req: GenerateRequest, request: Request):
             ]
             states.tools = await get_tools_for_llm()
             tool_map = await get_tool_map()
-            visible_tool_map = await get_visible_tool_map()
 
             while True:
                 if client_disconnected.is_set():
@@ -86,15 +85,26 @@ async def chat_stream(req: GenerateRequest, request: Request):
                     tool_args = json.loads(tool_call['function']['arguments'])
                     
                     try:
-                        tool_res = tool_map[tool_name](states, **tool_args)
-                        if tool_name in visible_tool_map:
-                            node_label = visible_tool_map[tool_name].node_label
-                            visible_res = visible_tool_map[tool_name].format(tool_args)
+                        tool_res = tool_map[tool_name](states, tool_args)
+                        if tool_name == "web_search":
                             await emit("agentFlowExecutedData", {
-                                "nodeLabel": node_label,
+                                "nodeLabel": "Visible Query Generator",
                                 "data": {
                                     "output": {
-                                        "content": json.dumps(visible_res, ensure_ascii=False)
+                                        "content": json.dumps({
+                                            "visible_web_search_query": [sq['q'] for sq in tool_args['search_query']]
+                                        }, ensure_ascii=False)
+                                    }
+                                }
+                            })
+                        elif tool_name == "open_url":
+                            await emit("agentFlowExecutedData", {
+                                "nodeLabel": "Visible URL",
+                                "data": {
+                                    "output": {
+                                        "content": json.dumps({
+                                            "visible_url": [o['url'] for o in tool_args['opens']]
+                                        }, ensure_ascii=False)
                                     }
                                 }
                             })

@@ -1,9 +1,8 @@
-from .mcp_tools import MCP_TOOLS, get_mcp_tool, initialize_mcp_tools
+from .mcp_tools import MCP_TOOLS, get_mcp_tool
 
 
 async def get_mcp_tool_map():
-    await initialize_mcp_tools()
     return {
-        tool['name']: get_mcp_tool(tool['name'])
+        tool['function']['name']: get_mcp_tool(tool['function']['name'])
         for tool in MCP_TOOLS
     }
