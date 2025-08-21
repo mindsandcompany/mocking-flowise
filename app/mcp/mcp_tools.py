@@ -56,7 +56,7 @@ def get_mcp_tool(tool_name: str):
         raise ValueError(f"Tool {tool_name} not found")
     server_id = MCP_TOOL_NAME_TO_SERVER_ID[tool_name]
 
-    async def call_mcp_tool(states, tool_input: dict):
+    async def call_mcp_tool(states, **tool_input):
         async with aiohttp.ClientSession() as session:
             token_response = await session.post(
                 "https://genos.mnc.ai:3443/api/admin/auth/login",

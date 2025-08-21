@@ -47,7 +47,7 @@ WEB_SEARCH = {
 
 async def web_search(
     states: States,
-    tool_input: dict
+    **tool_input
 ) -> str:
     
     try:

@@ -85,7 +85,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
                     tool_args = json.loads(tool_call['function']['arguments'])
                     
                     try:
-                        tool_res = tool_map[tool_name](states, tool_args)
+                        tool_res = tool_map[tool_name](states, **tool_args)
                         if tool_name == "web_search":
                             await emit("agentFlowExecutedData", {
                                 "nodeLabel": "Visible Query Generator",
@@ -113,7 +113,8 @@ async def chat_stream(req: GenerateRequest, request: Request):
                     except Exception as e:
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
-                    states.messages.append({"role": "tool", "content": tool_res, "tool_call_id": tool_call['id']})
+                    states.messages.append({"role": "tool", "content": str(tool_res), "tool_call_id": tool_call['id']})
+                    print(states.messages)
 
         except Exception as e:
             print(e)

@@ -60,6 +60,12 @@ SEARCHAPI_KEY=<your_searchapi_key>
 # REDIS_URL=redis://localhost:6379/0
 # 선택: 로컬 실행 포트 (기본 6666)
 # PORT=6666
+
+# MCP 연동용
+GENOS_ID=<genos_admin_id>
+GENOS_PW=<genos_admin_password>
+# 쉼표로 여러 서버 ID 등록 가능. 예: 12,34,56
+MCP_SERVER_ID=<_comma_separated_server_ids_>
 ```
 
 ## 실행 방법
@@ -121,16 +127,49 @@ curl -s http://localhost:5555/health | cat
 ## 툴 사용 및 노출 규칙
 - 툴 스키마: OpenAI 함수 호출 포맷을 따르며, 예시로 `web_search`가 등록되어 있습니다.
   - 등록 위치: `app/tools/web_search.py` 의 `WEB_SEARCH` 스키마, 실행 함수 `web_search()`
-  - 서버 등록: `app/tools/__init__.py` 의 `TOOL_MAP` (실행), `VISIBLE_TOOL_MAP` (UI 노출)
-  - 서버 사용: `app/api/chat.py`에서 `states.tools = [WEB_SEARCH]`로 사용
+  - 서버 등록: `app/tools/__init__.py` 의 `get_tool_map()` (실행), `get_visible_tool_map()` (UI 노출)
+  - 서버 사용: `app/api/chat.py`에서 `states.tools = await get_tools_for_llm()`로 사용
 - 사람이 볼 정보만 노출하기
   - 각 툴에 대응하는 `Visible*Model`을 정의하여 `format(args)`에서 공개 가능한 정보만 추립니다.
   - 서버는 `format(args)` 결과를 `json.dumps(...)`로 문자열화하여 `agentFlowExecutedData.data.data.output.content`에 넣어 보냅니다.
   - `nodeLabel`은 UI 노드명으로 사용됩니다.
 - 새 툴 추가 가이드(요약)
   1) `app/tools/my_tool.py`에 실행 함수, 스키마 `WEB_MY_TOOL`, 공개 모델 `VisibleMyToolModel` 구현
-  2) `app/tools/__init__.py`의 `TOOL_MAP`, `VISIBLE_TOOL_MAP`에 등록
-  3) `app/api/chat.py`의 `states.tools`에 `WEB_MY_TOOL` 추가
+  2) `app/tools/__init__.py`의 `get_tool_map()`, `get_visible_tool_map()`에 등록
+  3) `app/api/chat.py`의 `get_tools_for_llm()`에서 `WEB_MY_TOOL` 추가
+
+### MCP 툴 연동 규칙
+- 개요: GenOS MCP 서버에 등록된 툴을 불러와 OpenAI 규격의 툴 스키마로 변환합니다.
+  - 구현 위치: `app/mcp/mcp_tools.py`
+  - 공개 엔트리: `MCP_TOOLS`(LLM용 스키마 리스트), `get_mcp_tool(name)`(실행 함수 팩토리), `get_mcp_tool_map()`
+- 환경 변수
+  - `GENOS_ID`, `GENOS_PW`: MCP API 토큰 발급용 자격 증명
+  - `MCP_SERVER_ID`: 조회할 MCP 서버 ID(들), 쉼표구분 예: `12,34,56`
+- 스키마 변환
+  - MCP 툴의 `input_schema`를 OpenAI `tools` 포맷의 `parameters`로 매핑합니다.
+  - 결과 형태 예시:
+    ```json
+    {
+      "type": "function",
+      "function": {
+        "name": "open_url",
+        "description": "...",
+        "parameters": {"type":"object", "properties": {"opens": {"type":"array"}}, "required": ["opens"]}
+      }
+    }
+    ```
+- 실행 시그니처
+  - MCP 툴 실행 함수는 `async def(states, **tool_input)` 서명을 따릅니다.
+  - 내부적으로 `json={"tool_name": name, "input_schema": tool_input}` 페이로드로 MCP 서버에 호출합니다.
+- 서버 등록/사용
+  - `app/mcp/__init__.py`의 `get_mcp_tool_map()`으로 `{tool_name: callable}` 맵을 얻습니다.
+  - `app/tools/__init__.py`
+    - `get_tool_map()`에서 웹툴 + MCP 맵을 병합해 반환
+    - `get_tools_for_llm()`에서 `WEB_SEARCH + MCP_TOOLS`를 반환
+  - `app/api/chat.py`에서 요청 처리 중 `states.tools = await get_tools_for_llm()`로 주입합니다.
+- 주의사항
+  - 네트워크 오류 또는 인증 오류에 대비해 `.env`의 `GENOS_ID`, `GENOS_PW`, `MCP_SERVER_ID` 설정을 확인하세요.
+  - MCP 서버의 도구 스키마가 OpenAI 규격과 호환되지 않는 필드를 포함할 수 있으므로, 변환 로직이 `parameters`를 안전하게 구성하도록 되어 있습니다.
 
 ## Workflow Python Step (예시)
 GenOS 워크플로우의 Python Step을 생성한 후 아래 코드에서 `endpoint`를 여러분의 배포 주소로 바꾸어 사용하시면 됩니다.
