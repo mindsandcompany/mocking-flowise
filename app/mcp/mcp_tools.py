@@ -1,7 +1,8 @@
 import os
-import asyncio
 import aiohttp
 import requests
+
+from app.utils import States
 
 
 def get_tools_description(server_id: str):
@@ -56,7 +57,7 @@ def get_mcp_tool(tool_name: str):
         raise ValueError(f"Tool {tool_name} not found")
     server_id = MCP_TOOL_NAME_TO_SERVER_ID[tool_name]
 
-    async def call_mcp_tool(states, **tool_input):
+    async def call_mcp_tool(states: States, **tool_input):
         async with aiohttp.ClientSession() as session:
             token_response = await session.post(
                 "https://genos.mnc.ai:3443/api/admin/auth/login",
@@ -75,13 +76,20 @@ def get_mcp_tool(tool_name: str):
                 json={"tool_name": tool_name, "input_schema": tool_input}
             )
             response.raise_for_status()
-            return (await response.json())['data']
+            data = (await response.json())['data']
+            if tool_name == "web_search":
+                outputs = []
+                for idx, item in enumerate(data):
+                    id = f'turn{states.turn}search{idx}'
+                    states.tool_results[id] = item
+                    outputs.append({'id': id, **item})
+                states.turn += 1
+                return "\n".join([
+                    f'- {item["title"]} ({item["source"]}): {item["date"]} — {item["snippet"]} 【{item["id"]}】' if item['date'] else
+                    f'- {item["title"]} ({item["source"]}): {item["snippet"]} 【{item["id"]}】'
+                    for item in outputs
+                ])
+            
+            return data
 
     return call_mcp_tool
-
-
-if __name__ == "__main__":
-    data = get_tools_description("64")
-    print(data)
-    # data = asyncio.run(get_mcp_tool("SamsungSecuritiesRetrieverTool")({"query": "현대자동차의 매출"}))
-    # print(data)

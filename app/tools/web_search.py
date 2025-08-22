@@ -22,7 +22,7 @@ class MultipleSearchModel(BaseModel):
 WEB_SEARCH = {
     "type": "function",
     "function": {
-        "name": "web_search",
+        "name": "search",
         "description": "Search the web for information.",
         "parameters": {
             "type": "object",
@@ -51,7 +51,7 @@ async def web_search(
 ) -> str:
     
     try:
-        tool_input: MultipleSearchModel = MultipleSearchModel.model_validate(tool_input)
+        tool_input = MultipleSearchModel(**tool_input)
     except Exception as e:
         return f"Error validating `web_search`: {e}"
 
@@ -71,15 +71,15 @@ async def web_search(
     
     outputs = []
     for idx, item in enumerate(flatted_res):
-        id = f'turn{states.turn}search{idx}'
-        states.tool_results[id] = item
+        id = f'{states.turn}:{idx}'
+        states.tool_state.id_to_url[id] = item['url']
         outputs.append({'id': id, **item})
     
     states.turn += 1
     
     return "\n".join([
-        f'- {item["title"]} ({item["source"]}): {item["date"]} — {item["snippet"]} 【{item["id"]}】' if item['date'] else
-        f'- {item["title"]} ({item["source"]}): {item["snippet"]} 【{item["id"]}】'
+        f'- 【{item["id"]}†{item["title"]}†{item["source"]}】: {item["date"]} — {item["snippet"]}' if item['date'] else
+        f'- 【{item["id"]}†{item["title"]}†{item["source"]}】: {item["snippet"]}'
         for item in outputs
     ])
 

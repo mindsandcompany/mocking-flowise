@@ -2,7 +2,7 @@ import os
 import pathlib
 import sys
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from openai import AsyncOpenAI
 
@@ -20,11 +20,19 @@ except Exception as e:
     sys.exit(1)
 
 
+class ToolState(BaseModel):
+    id_to_url: dict[str, str] = Field(default_factory=dict)
+    url_to_page: dict[str, object] = Field(default_factory=dict)
+    current_url: str | None = None
+    tool_results: dict[str, object] = Field(default_factory=dict)
+
+
 class States:
     messages: list[dict]
     turn: int = 0
     tools: list[dict] = []
-    tool_results: dict[str, Any] = {}
+    tool_state: ToolState = ToolState()
+    tool_results: dict[str, object] = {}
 
 
 async def call_llm_stream(

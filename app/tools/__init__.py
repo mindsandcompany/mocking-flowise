@@ -1,12 +1,13 @@
 from .web_search import web_search, WEB_SEARCH
-from app.mcp import get_mcp_tool_map
-from app.mcp.mcp_tools import MCP_TOOLS
+from .open_url import open, OPEN_URL
+from app.mcp import MCP_TOOLS, get_mcp_tool_map
 
 
 async def get_tool_map():
     mcp_map = await get_mcp_tool_map()
     return {
-        "web_search": web_search,
+        "search": web_search,
+        "open": open,
         **mcp_map,
     }
 
@@ -14,5 +15,6 @@ async def get_tool_map():
 async def get_tools_for_llm():
     return [
         WEB_SEARCH,
+        OPEN_URL,
         *MCP_TOOLS
     ]

@@ -67,6 +67,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
             while True:
                 if client_disconnected.is_set():
                     break
+                await emit("tool_state", states.tool_state.model_dump())
                 async for res in call_llm_stream(
                     messages=states.messages,
                     tools=states.tools,
@@ -86,7 +87,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
                     
                     try:
                         tool_res = tool_map[tool_name](states, **tool_args)
-                        if tool_name == "web_search":
+                        if tool_name == "search":
                             await emit("agentFlowExecutedData", {
                                 "nodeLabel": "Visible Query Generator",
                                 "data": {
@@ -97,17 +98,33 @@ async def chat_stream(req: GenerateRequest, request: Request):
                                     }
                                 }
                             })
-                        elif tool_name == "open_url":
-                            await emit("agentFlowExecutedData", {
-                                "nodeLabel": "Visible URL",
-                                "data": {
-                                    "output": {
-                                        "content": json.dumps({
-                                            "visible_url": [o['url'] for o in tool_args['opens']]
-                                        }, ensure_ascii=False)
+                        elif tool_name == "open":
+                            try:
+                                if tool_args.get('id') and tool_args['id'].startswith('http'):
+                                    url = tool_args['id']
+                                elif tool_args.get('id') is None:
+                                    curr_url = getattr(states.tool_state, "current_url", None)
+                                    if curr_url and curr_url in states.tool_state.url_to_page:
+                                        url = curr_url
+                                    else:
+                                        url = states.tool_state.url_to_page.get(curr_url)
+                                else:
+                                    url = states.tool_state.id_to_url.get(tool_args['id'])
+                                    if not url:
+                                        url = states.tool_state.url_to_page.get(tool_args['id'])
+                                await emit("agentFlowExecutedData", {
+                                    "nodeLabel": "Visible URL",
+                                    "data": {
+                                        "output": {
+                                            "content": json.dumps({
+                                                "visible_url": url
+                                            }, ensure_ascii=False)
+                                        }
                                     }
-                                }
-                            })
+                                })
+                            except Exception as e:
+                                pass
+
                         if asyncio.iscoroutine(tool_res):
                             tool_res = await tool_res
                     except Exception as e:

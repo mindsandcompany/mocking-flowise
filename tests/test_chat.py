@@ -1,9 +1,11 @@
 import aiohttp, json, asyncio
+import re
+from urllib.parse import urlparse
 
 
 async def main() -> dict:
     data = {
-        "question": "영화 '84제곱미터'의 젊은 남자 주연배우의 데뷔작의 방송 횟수는?"
+        "question": "오늘 서울 날씨 알려줘"
     }
     endpoint = "http://0.0.0.0:5555/chat/stream"
 
@@ -20,6 +22,88 @@ async def main() -> dict:
             "Accept": "text/event-stream"
         }) as resp:
             reasoning = ""
+            tool_state = None
+            citation_buffer = ""
+            inside_citation = False
+
+            def replace_citation_segment(segment: str) -> str:
+                # segment: "【...】" 형태. 내부의 turn:id 만 URL로 치환하고 나머지는 제거
+                try:
+                    if not (segment.startswith("【") and segment.endswith("】")):
+                        return segment
+                    body = segment[1:-1]
+                    ids = re.findall(r"(\d+:\d+)", body)
+                    if not ids:
+                        return ""
+                    id_to_url = {}
+                    if isinstance(tool_state, dict):
+                        id_to_url = tool_state.get("id_to_url", {}) or {}
+                    mapped = [id_to_url.get(idv, idv) for idv in ids]
+                    
+                    def get_domain_without_lib(url):
+                        try:
+                            # 1. URL 파싱하여 'netloc' (도메인 부분) 추출
+                            parsed_url = urlparse(url)
+                            domain = parsed_url.netloc
+
+                            # 2. 'www.'가 있다면 제거
+                            if domain.startswith('www.'):
+                                domain = domain[4:]
+                                
+                            return domain
+                        except Exception:
+                            return "link"
+                    
+                    styled = [
+                        f'<a href="{url}" target="_blank" class="btn__chip"> <strong>{get_domain_without_lib(url)}</strong></a>'
+                        for url in mapped
+                    ]
+                    return " ".join(styled)
+                except Exception:
+                    return segment
+
+            def process_token(ev_text: str):
+                nonlocal citation_buffer, inside_citation, text_acc
+                i = 0
+                n = len(ev_text)
+                while i < n:
+                    if inside_citation:
+                        citation_buffer += ev_text[i]
+                        i += 1
+                        # 버퍼에 닫힘이 생기면 한 세그먼트 처리
+                        close_idx = citation_buffer.find("】")
+                        if close_idx != -1:
+                            segment = citation_buffer[:close_idx+1]
+                            remainder = citation_buffer[close_idx+1:]
+                            replaced = replace_citation_segment(segment)
+                            text_acc += replaced
+                            print(replaced, flush=True, end="")
+                            citation_buffer = ""
+                            inside_citation = False
+                            if remainder:
+                                # remainder 내에 추가 인용이 있을 수 있으므로 재귀적으로 처리
+                                process_token(remainder)
+                            # 이 케이스는 remainder 처리까지 끝났으므로 루프 계속
+                    else:
+                        # 인용 시작 찾기
+                        start_idx = ev_text.find("【", i)
+                        if start_idx == -1:
+                            chunk = ev_text[i:]
+                            if chunk:
+                                text_acc += chunk
+                                print(chunk, flush=True, end="")
+                            break
+                        # 인용 시작 전 일반 텍스트 출력
+                        if start_idx > i:
+                            chunk = ev_text[i:start_idx]
+                            text_acc += chunk
+                            print(chunk, flush=True, end="")
+                        # 인용 시작부터 버퍼링 시작
+                        inside_citation = True
+                        citation_buffer = "【"
+                        i = start_idx + 1
+                # 루프 종료. 인용 중이면 계속 버퍼링 상태 유지
+
             async for line in resp.content:
                 if not line:
                     continue
@@ -34,7 +118,9 @@ async def main() -> dict:
                 event = payload.get("event")
                 ev_data = payload.get("data")
 
-                if event == "reasoning_token":
+                if event == "tool_state":
+                    tool_state = ev_data
+                elif event == "reasoning_token":
                     reasoning += ev_data
                 elif reasoning:
                     result.setdefault('agentFlowExecutedData', []).append({
@@ -48,8 +134,7 @@ async def main() -> dict:
                     
                 if event == "token":
                     if isinstance(ev_data, str):
-                        text_acc += ev_data
-                    print(ev_data, flush=True, end="")
+                        process_token(ev_data)
                 elif event == "agentFlowExecutedData":
                     result.setdefault('agentFlowExecutedData', []).append(ev_data)
                     print("agentFlowExecutedData")
