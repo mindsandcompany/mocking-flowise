@@ -75,7 +75,17 @@ async def main() -> dict:
                         if close_idx != -1:
                             segment = citation_buffer[:close_idx+1]
                             remainder = citation_buffer[close_idx+1:]
-                            replaced = replace_citation_segment(segment)
+                            try:
+                                if re.fullmatch(r"【\d+†chart】", segment):
+                                    key = segment[1:-1]
+                                    id_to_iframe = {}
+                                    if isinstance(tool_state, dict):
+                                        id_to_iframe = tool_state.get("id_to_iframe", {}) or {}
+                                    replaced = id_to_iframe.get(key, "")
+                                else:
+                                    replaced = replace_citation_segment(segment)
+                            except Exception:
+                                replaced = ""
                             text_acc += replaced
                             print(replaced, flush=True, end="")
                             citation_buffer = ""

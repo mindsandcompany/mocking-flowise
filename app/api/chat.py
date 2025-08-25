@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from datetime import datetime
 from uuid import uuid4
 
@@ -128,6 +129,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
                         if asyncio.iscoroutine(tool_res):
                             tool_res = await tool_res
                     except Exception as e:
+                        print(e)
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
                     states.messages.append({"role": "tool", "content": str(tool_res), "tool_call_id": tool_call['id']})
@@ -137,6 +139,13 @@ async def chat_stream(req: GenerateRequest, request: Request):
             await emit("error", str(e))
         finally:
             last_message = states.messages[-1]
+            
+            if isinstance(last_message, dict) and last_message.get("role") == "assistant":
+                content = last_message.get("content", "")
+                if isinstance(content, str):
+                    content = re.sub(r"【[^】]*】", "", content).strip()
+                    last_message = {**last_message, "content": content}
+            
             history.append(last_message)
             await store.save_messages(chat_id, history)
             await emit("result", None)
