@@ -25,6 +25,7 @@ class ToolState(BaseModel):
     url_to_page: dict[str, object] = Field(default_factory=dict)
     current_url: str | None = None
     tool_results: dict[str, object] = Field(default_factory=dict)
+    id_to_iframe: dict[str, str] = Field(default_factory=dict)
 
 
 class States:
