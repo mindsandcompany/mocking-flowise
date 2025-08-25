@@ -104,25 +104,20 @@ async def chat_stream(req: GenerateRequest, request: Request):
                                 if tool_args.get('id') and tool_args['id'].startswith('http'):
                                     url = tool_args['id']
                                 elif tool_args.get('id') is None:
-                                    curr_url = getattr(states.tool_state, "current_url", None)
-                                    if curr_url and curr_url in states.tool_state.url_to_page:
-                                        url = curr_url
-                                    else:
-                                        url = states.tool_state.url_to_page.get(curr_url)
+                                    url = getattr(states.tool_state, "current_url", None)
                                 else:
                                     url = states.tool_state.id_to_url.get(tool_args['id'])
-                                    if not url:
-                                        url = states.tool_state.url_to_page.get(tool_args['id'])
-                                await emit("agentFlowExecutedData", {
-                                    "nodeLabel": "Visible URL",
-                                    "data": {
-                                        "output": {
-                                            "content": json.dumps({
-                                                "visible_url": url
-                                            }, ensure_ascii=False)
+                                if url:
+                                    await emit("agentFlowExecutedData", {
+                                        "nodeLabel": "Visible URL",
+                                        "data": {
+                                            "output": {
+                                                "content": json.dumps({
+                                                    "visible_url": url
+                                                }, ensure_ascii=False)
+                                            }
                                         }
-                                    }
-                                })
+                                    })
                             except Exception as e:
                                 pass
 
