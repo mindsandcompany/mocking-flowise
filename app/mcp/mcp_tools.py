@@ -87,7 +87,7 @@ def get_mcp_tool(tool_name: str):
             elif tool_name == "generate_chart":
                 num_charts = len(states.tool_state.id_to_iframe)
                 states.tool_state.id_to_iframe[f"{num_charts}†chart"] = data[0]
-                return f"Chart '{tool_input['title']}' has been successfully generated. You can display it to the user by using the following ID: `【{num_charts}†chart】`"
+                return f"Chart '{tool_input['data_json']['title']}' has been successfully generated. You can display it to the user by using the following ID: `【{num_charts}†chart】`"
             else:
                 return "\n".join([
                     f'- {item["title"]} ({item["source"]}): {item["date"]} — {item["snippet"]} 【{item["id"]}】' if item['date'] else
