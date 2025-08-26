@@ -91,6 +91,7 @@ async def open(
     
     states.tool_state.url_to_page[url] = page_contents
     states.tool_state.current_url = url
+    states.tool_state.id_to_url[f"{states.turn}:0"] = url
     for link_id, link_target in page_contents.urls.items():
         states.tool_state.id_to_url[f"{states.turn}:{link_id}"] = link_target
     response = make_response(page_contents, tool_input.loc, tool_input.num_lines)
