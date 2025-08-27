@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 from datetime import datetime
 from uuid import uuid4
@@ -11,9 +12,11 @@ from pydantic import BaseModel, ConfigDict
 from app.utils import call_llm_stream, is_sse, ROOT_DIR, States
 from app.stores.session_store import SessionStore
 from app.tools import get_tool_map, get_tools_for_llm
+from app.logger import get_logger
 
 router = APIRouter()
 store = SessionStore()
+log = get_logger(__name__)
 
 
 class GenerateRequest(BaseModel):
@@ -23,7 +26,13 @@ class GenerateRequest(BaseModel):
 
 
 @router.post("/chat/stream")
-async def chat_stream(req: GenerateRequest, request: Request):
+async def chat_stream(
+    req: GenerateRequest, 
+    request: Request
+) -> StreamingResponse:
+    """
+    SSE 프로토콜을 사용하여 채팅 스트리밍을 제공합니다.
+    """
     queue: asyncio.Queue[str] = asyncio.Queue()
     SENTINEL = "__STREAM_DONE__"
     client_disconnected = asyncio.Event()
@@ -42,6 +51,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
     async def runner():
         try:
             chat_id = req.chatId or uuid4().hex
+            log.info("chat stream started", extra={"chat_id": chat_id})
 
             system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
                 current_date=datetime.now().strftime("%Y-%m-%d"),
@@ -49,6 +59,13 @@ async def chat_stream(req: GenerateRequest, request: Request):
             )
 
             states = States()
+            model = os.getenv("DEFAULT_MODEL")
+            llm_regex = re.compile(r"<llm>(.*?)</llm>")
+            llm_match = llm_regex.search(req.question)
+            if llm_match:
+                log.info("model override detected", extra={"chat_id": chat_id, "model": model})
+                model = llm_match.group(1)
+                req.question = llm_regex.sub("", req.question).strip()
             persisted = await store.get_messages(chat_id)
             if persisted:
                 history = [
@@ -73,6 +90,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
                     messages=states.messages,
                     tools=states.tools,
                     temperature=0.2,
+                    model=model
                 ):
                     if is_sse(res):
                         await emit(res["event"], res["data"])
@@ -80,11 +98,13 @@ async def chat_stream(req: GenerateRequest, request: Request):
                         states.messages.append(res)
 
                 tool_calls = res.get("tool_calls")
-                if not tool_calls:
+                contents = res.get("content")
+                if not tool_calls and contents:
                     break
                 for tool_call in tool_calls:
                     tool_name = tool_call['function']['name']
                     tool_args = json.loads(tool_call['function']['arguments'])
+                    log.info("tool call", extra={"chat_id": chat_id, "tool": tool_name})
                     
                     try:
                         tool_res = tool_map[tool_name](states, **tool_args)
@@ -124,12 +144,13 @@ async def chat_stream(req: GenerateRequest, request: Request):
                         if asyncio.iscoroutine(tool_res):
                             tool_res = await tool_res
                     except Exception as e:
-                        print(e)
+                        log.exception("tool call failed", extra={"chat_id": chat_id, "tool": tool_name})
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
                     states.messages.append({"role": "tool", "content": str(tool_res), "tool_call_id": tool_call['id']})
 
         except Exception as e:
+            log.exception("chat stream failed")
             print(e)
             await emit("error", str(e))
         finally:
@@ -145,6 +166,7 @@ async def chat_stream(req: GenerateRequest, request: Request):
             await store.save_messages(chat_id, history)
             await emit("result", None)
             await queue.put(SENTINEL)
+            log.info("chat stream finished", extra={"chat_id": chat_id})
 
     async def sse():
         producer = asyncio.create_task(runner())

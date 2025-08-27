@@ -110,8 +110,7 @@ async def open_url(
     url: str,
     turn: int
 ) -> PageContents:
-    print(f"🕷️ 크롤링 시작: {url}")
-    
+        
     _download_cache = {}
     
     async def download_async(url: str) -> str:

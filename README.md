@@ -15,6 +15,7 @@
 - 툴 실행 내용을 GenOS 채팅 UI에 노출하기 위한 전용 이벤트(`agentFlowExecutedData`) 전송
 - Docker/Compose로 손쉽게 실행 가능 (API + Redis)
 - Redis 기반 멀티세션(chatId) 지원: `chatId`로 세션 저장/복구, 스트림 시작 시 `session` 이벤트로 `chatId` 알림
+- 로깅 지원: `LOG_LEVEL`, `LOG_FORMAT=json|console` 환경변수로 제어 (`app/logger.py`)
 
 ## 디렉터리 구조
 ```text
@@ -35,6 +36,7 @@ mock_workflow/
   │  │  ├─ __init__.py          # TOOL_MAP, VISIBLE_TOOL_MAP 등록
   │  │  └─ web_search.py        # 웹 검색 툴 및 공개 포맷 정의
   │  ├─ utils.py                # OpenRouter 클라이언트, 스트림 유틸 등
+  │  ├─ logger.py               # 로거 설정/유틸
   │  └─ .env                    # 주요한 환경변수 관리
   ├─ tests/
   │  └─ test_chat.py            # SSE 수신 예제 스크립트
@@ -66,6 +68,10 @@ GENOS_ID=<genos_admin_id>
 GENOS_PW=<genos_admin_password>
 # 쉼표로 여러 서버 ID 등록 가능. 예: 12,34,56
 MCP_SERVER_ID=<_comma_separated_server_ids_>
+
+# 로깅 설정
+# LOG_LEVEL=INFO            # DEBUG, INFO, WARNING, ERROR, CRITICAL
+# LOG_FORMAT=console        # console 또는 json
 ```
 
 ## 실행 방법
