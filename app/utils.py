@@ -1,10 +1,15 @@
 import os
 import pathlib
+import requests
 import sys
 from typing import Any
 from pydantic import BaseModel, Field
 
 from openai import AsyncOpenAI
+
+from app.logger import get_logger
+
+log = get_logger(__name__)
 
 ROOT_DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -15,8 +20,8 @@ try:
         api_key=os.getenv("OPENROUTER_API_KEY"),
     )
 except Exception as e:
-    print("오류: OPENROUTER_API_KEY 환경 변수가 설정되지 않았습니다.")
-    print("환경 변수를 설정하거나 .env 파일에 추가해주세요.")
+    log.error("오류: OPENROUTER_API_KEY 환경 변수가 설정되지 않았습니다.")
+    log.error("환경 변수를 설정하거나 .env 파일에 추가해주세요.")
     sys.exit(1)
 
 
@@ -140,5 +145,13 @@ def is_sse(response):
     try:
         SSE.model_validate(response)
         return True
+    except Exception:
+        return False
+
+
+def is_valid_model(model: str) -> bool:
+    try:
+        model_list = [i['id'] for i in requests.get("https://openrouter.ai/api/v1/models").json()['data']]
+        return model in model_list
     except Exception:
         return False

@@ -45,6 +45,42 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(base, ensure_ascii=False, default=str)
 
 
+class ConsoleFormatter(logging.Formatter):
+    """Console formatter that appends extra fields as key=value pairs.
+
+    Safe for records without those extras (no KeyError).
+    """
+
+    _reserved = {
+        "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+        "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+        "created", "msecs", "relativeCreated", "thread", "threadName", "processName",
+        "process", "asctime"
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        base = super().format(record)
+        extras: Dict[str, Any] = {}
+        for key, value in record.__dict__.items():
+            if key in self._reserved or key.startswith("_"):
+                continue
+            extras[key] = value
+        if not extras:
+            return base
+        parts = []
+        for k in sorted(extras.keys()):
+            v = extras[k]
+            try:
+                if isinstance(v, (str, int, float, bool)) or v is None:
+                    val = v
+                else:
+                    val = json.dumps(v, ensure_ascii=False, default=str)
+            except Exception:
+                val = str(v)
+            parts.append(f"{k}={val}")
+        return f"{base} | " + ", ".join(parts)
+
+
 def setup_logging() -> logging.Logger:
     """Configure root logger based on environment variables.
 
@@ -60,8 +96,8 @@ def setup_logging() -> logging.Logger:
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
-        # human-readable console format
-        formatter = logging.Formatter(
+        # human-readable console format with extras
+        formatter = ConsoleFormatter(
             fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
@@ -78,4 +114,4 @@ def setup_logging() -> logging.Logger:
 
 
 def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(name) 
+    return logging.getLogger(name)

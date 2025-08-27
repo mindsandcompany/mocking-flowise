@@ -9,7 +9,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from app.utils import call_llm_stream, is_sse, ROOT_DIR, States
+from app.utils import (
+    call_llm_stream, 
+    is_sse, 
+    is_valid_model, 
+    ROOT_DIR, 
+    States
+)
 from app.stores.session_store import SessionStore
 from app.tools import get_tool_map, get_tools_for_llm
 from app.logger import get_logger
@@ -65,7 +71,11 @@ async def chat_stream(
             if llm_match:
                 log.info("model override detected", extra={"chat_id": chat_id, "model": model})
                 model = llm_match.group(1)
+                if not is_valid_model(model):
+                    model = os.getenv("DEFAULT_MODEL")
+                    log.warning("model not found", extra={"chat_id": chat_id, "model": model})
                 req.question = llm_regex.sub("", req.question).strip()
+            
             persisted = await store.get_messages(chat_id)
             if persisted:
                 history = [
@@ -99,12 +109,17 @@ async def chat_stream(
 
                 tool_calls = res.get("tool_calls")
                 contents = res.get("content")
+                # 툴 호출이 없고 콘텐츠가 있으면 종료
                 if not tool_calls and contents:
                     break
+                # 툴 호출이 없고 콘텐츠가 없으면 다시 인퍼런스 시도
+                elif not tool_calls and not contents:
+                    continue
+                # 툴 호출이 있으면 툴 호출 처리
                 for tool_call in tool_calls:
                     tool_name = tool_call['function']['name']
                     tool_args = json.loads(tool_call['function']['arguments'])
-                    log.info("tool call", extra={"chat_id": chat_id, "tool": tool_name})
+                    log.info("tool call", extra={"chat_id": chat_id, "tool_name": tool_name})
                     
                     try:
                         tool_res = tool_map[tool_name](states, **tool_args)
@@ -144,15 +159,15 @@ async def chat_stream(
                         if asyncio.iscoroutine(tool_res):
                             tool_res = await tool_res
                     except Exception as e:
-                        log.exception("tool call failed", extra={"chat_id": chat_id, "tool": tool_name})
+                        log.exception("tool call failed", extra={"chat_id": chat_id, "tool_name": tool_name})
                         tool_res = f"Error calling {tool_name}: {e}\n\nTry again with different arguments."
                     
                     states.messages.append({"role": "tool", "content": str(tool_res), "tool_call_id": tool_call['id']})
 
         except Exception as e:
             log.exception("chat stream failed")
-            print(e)
             await emit("error", str(e))
+            await emit("token", f"\n\n오류가 발생했습니다: {e}")
         finally:
             last_message = states.messages[-1]
             
