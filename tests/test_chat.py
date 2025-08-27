@@ -5,7 +5,8 @@ from urllib.parse import urlparse
 
 async def main() -> dict:
     data = {
-        "question": "오늘 서울 날씨 알려줘"
+        "question": "삼성전자의 2025년 1분기 영업이익 발표 당일, 코스피 지수 상승률은 몇 퍼센트인가?",
+        # "chatID": "qwer1234"
     }
     endpoint = "http://0.0.0.0:5555/chat/stream"
 
@@ -137,19 +138,43 @@ async def main() -> dict:
                         "nodeLabel": "Visible Reasoner",
                         "data": {"output": {"content": json.dumps({"visible_rationale": reasoning}, ensure_ascii=False)}}
                     })
-                    reasoning = ""
-                    print("agentFlowExecutedData")
-                    print(result['agentFlowExecutedData'])
+                    print()
+                    print("🧠 Thinking...")
+                    print(reasoning)
                     print("="*100)
+                    reasoning = ""
                     
                 if event == "token":
                     if isinstance(ev_data, str):
                         process_token(ev_data)
                 elif event == "agentFlowExecutedData":
                     result.setdefault('agentFlowExecutedData', []).append(ev_data)
-                    print("agentFlowExecutedData")
-                    print(result['agentFlowExecutedData'])
-                    print("="*100)
+                    if ev_data.get("nodeLabel") == "Visible Reasoner":
+                        reasoning = json.loads(ev_data.get("data", {}).get("output", {}).get("content", "")).get("visible_rationale", "")
+                        print()
+                        print("="*100)
+                        print("🧠 Thinking...")
+                        print(reasoning)
+                        print()
+                        print("="*100)
+                    elif ev_data.get("nodeLabel") == "Visible URL":
+                        url = json.loads(ev_data.get("data", {}).get("output", {}).get("content", "")).get("visible_url", "")
+                        if url:
+                            print()
+                            print("="*100)
+                            print("👀 Reading...")
+                            print("🔗", url)
+                            print()
+                            print("="*100)
+                    elif ev_data.get("nodeLabel") == "Visible Query Generator":
+                        query = json.loads(ev_data.get("data", {}).get("output", {}).get("content", "")).get("visible_web_search_query", [])
+                        if query:
+                            print()
+                            print("="*100)
+                            print("🔍 Searching...")
+                            print("     ".join([f"🔍 {q}" for q in query]))
+                            print()
+                            print("="*100)
                 elif event == "error":
                     result["message"] = ev_data
                     result["success"] = False
@@ -158,9 +183,6 @@ async def main() -> dict:
                     # 토큰만 왔다가 최종 result가 없으면 text로 보강
                     if text_acc and "text" not in result:
                         result["text"] = text_acc
-                    print("result")
-                    print(result)
-                    print("="*100)
 
     # 워크플로우 다음 스텝으로 넘길 데이터 머지 후 반환
     data.update(result)
