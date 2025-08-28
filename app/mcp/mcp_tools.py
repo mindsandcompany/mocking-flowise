@@ -78,19 +78,7 @@ def get_mcp_tool(tool_name: str):
             )
             response.raise_for_status()
             data = (await response.json())['data']
-            if tool_name == "web_search":
-                outputs = []
-                for idx, item in enumerate(data):
-                    id = f'turn{states.turn}search{idx}'
-                    states.tool_results[id] = item
-                    outputs.append({'id': id, **item})
-                states.turn += 1
-                return "\n".join([
-                    f'- {item["title"]} ({item["source"]}): {item["date"]} — {item["snippet"]} 【{item["id"]}】' if item['date'] else
-                    f'- {item["title"]} ({item["source"]}): {item["snippet"]} 【{item["id"]}】'
-                    for item in outputs
-                ])
-            elif tool_name == "generate_chart":
+            if tool_name == "generate_chart":
                 num_charts = len(states.tool_state.id_to_iframe)
                 states.tool_state.id_to_iframe[f"{num_charts}†chart"] = data[0]
                 if isinstance(tool_input.get('data_json'), str):
