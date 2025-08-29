@@ -1036,7 +1036,12 @@ async def run(data: dict) -> dict:
             id_to_url = {}
             if isinstance(tool_state, dict):
                 id_to_url = tool_state.get("id_to_url", {}) or {}
-            mapped = [id_to_url[idv] for idv in ids if idv in id_to_url]
+            # Remove duplicate URLs while preserving order
+            mapped = []
+            for idv in ids:
+                url_value = id_to_url.get(idv)
+                if url_value and url_value not in mapped:
+                    mapped.append(url_value)
             
             def get_domain(url):
                 try:
