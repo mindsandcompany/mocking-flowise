@@ -34,6 +34,7 @@ class ToolState(BaseModel):
 
 
 class States:
+    user_id: str = None
     messages: list[dict]
     turn: int = 0
     tools: list[dict] = []

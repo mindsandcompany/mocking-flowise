@@ -28,6 +28,7 @@ log = get_logger(__name__)
 class GenerateRequest(BaseModel):
     question: str
     chatId: str | None = None
+    userInfo: dict | None = None
     model_config = ConfigDict(extra='allow')
 
 
@@ -56,15 +57,18 @@ async def chat_stream(
 
     async def runner():
         try:
+            states = States()
             chat_id = req.chatId or uuid4().hex
             log.info("chat stream started", extra={"chat_id": chat_id})
+
+            if req.userInfo:
+                states.user_id = req.userInfo.get("id")
 
             system_prompt = (ROOT_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").format(
                 current_date=datetime.now().strftime("%Y-%m-%d"),
                 locale="ko-KR"
             )
 
-            states = States()
             model = os.getenv("DEFAULT_MODEL")
             llm_regex = re.compile(r"<llm>(.*?)</llm>")
             llm_match = llm_regex.search(req.question)
@@ -76,17 +80,25 @@ async def chat_stream(
                     log.warning("model not found", extra={"chat_id": chat_id, "model": model})
                 req.question = llm_regex.sub("", req.question).strip()
             
-            persisted = await store.get_messages(chat_id)
-            if persisted:
-                history = [
-                    *persisted,
-                    {"role": "user", "content": req.question}
-                ]
-            else:
-                history = [{"role": "user", "content": req.question}]
+            if states.user_id:
+                model_set_context_list = await store.get_messages(states.user_id)
+                if model_set_context_list:
+                    model_set_context = [{
+                            "role": "system",
+                            "content": "### User Memory\n" + "\n".join([f"{idx}. {msc}" for idx, msc in enumerate(model_set_context_list,   start=1)])
+                        }]
+                else:
+                    model_set_context = []
+            
+            persisted = (await store.get_messages(chat_id)) or []
+            history = [
+                *persisted,
+                {"role": "user", "content": req.question}
+            ]
             
             states.messages = [
                 {"role": "system", "content": system_prompt},
+                *model_set_context,
                 *history
             ]
             states.tools = await get_tools_for_llm()
